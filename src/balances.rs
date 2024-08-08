@@ -1,4 +1,6 @@
 use std::collections::BTreeMap;
+
+#[derive(Debug)]
 pub struct Pallet {
     // storage mapping from accounts (String) to balances (u128)
     balances: BTreeMap<String, u128>
@@ -40,7 +42,7 @@ impl Pallet {
 
         Ok(())
     }
-
+    // New Balances Pallet
     pub fn new() -> Self {
         Self {
             balances: BTreeMap::new()
