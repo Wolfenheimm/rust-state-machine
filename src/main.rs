@@ -1,20 +1,38 @@
 mod balances;
 mod system;
 
+mod types {
+    pub type AccountId = String;
+    pub type Balance = u128;
+    pub type BlockNumber = u32;
+    pub type Nonce = u32;
+}
+
 #[derive(Debug)]
 pub struct Runtime {
-    system: system::Pallet,
-    balances: balances::Pallet
+    system: system::Pallet<Self>,
+    balances: balances::Pallet<Self>,
+}
+
+impl system::Config for Runtime {
+    type AccountId = types::AccountId;
+    type BlockNumber = types::BlockNumber;
+    type Nonce = types::Nonce;
+}
+
+impl balances::Config for Runtime {
+    type Balance = types::Balance;
 }
 
 impl Runtime {
     fn new() -> Self {
-        Self{
+        Self {
             system: system::Pallet::new(),
-            balances: balances::Pallet::new()
+            balances: balances::Pallet::new(),
         }
     }
 }
+
 fn main() {
     let mut runtime = Runtime::new();
     let alice = "alice".to_string();
@@ -27,10 +45,16 @@ fn main() {
     assert_eq!(runtime.system.block_number(), 1);
 
     runtime.system.inc_nonce(&alice);
-    let _res = runtime.balances.transfer(alice.clone(), bob.clone(), 30).map_err(|e| eprintln!("{}", e));
+    let _res = runtime
+        .balances
+        .transfer(&alice, &bob, 30)
+        .map_err(|e| eprintln!("{}", e));
 
     runtime.system.inc_nonce(&alice);
-    let _res = runtime.balances.transfer(alice, charlie, 20).map_err(|e| eprintln!("{}", e));
+    let _res = runtime
+        .balances
+        .transfer(&alice, &charlie, 20)
+        .map_err(|e| eprintln!("{}", e));
 
     println!("{:#?}", runtime);
 }

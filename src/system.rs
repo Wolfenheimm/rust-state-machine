@@ -1,34 +1,45 @@
+use core::ops::AddAssign;
 use std::collections::BTreeMap;
 
+use num::traits::{One, Zero};
+
+pub trait Config {
+    type AccountId: Ord + ToString + Clone;
+    type BlockNumber: Zero + One + AddAssign + Copy;
+    type Nonce: Zero + One + Copy;
+}
 #[derive(Debug)]
-pub struct Pallet {
-    block_number: u32,
-    pub(crate) nonce: BTreeMap<String, u32>
+pub struct Pallet<T: Config> {
+    block_number: T::BlockNumber,
+    nonce: BTreeMap<T::AccountId, T::Nonce>,
 }
 
-impl Pallet {
-
+impl<T: Config> Pallet<T> {
     // Get the current block number
-    pub fn block_number(&self) -> u32 {
+    pub fn block_number(&self) -> T::BlockNumber {
         self.block_number
     }
 
     // Increase the block number
-    pub fn inc_block_number(&mut self){
-        self.block_number += 1;
+    pub fn inc_block_number(&mut self) {
+        self.block_number += T::BlockNumber::one();
     }
 
     // Increment the nonce
-    pub fn inc_nonce(&mut self, who: &String){
-        let nonce_value = self.nonce.get(who).unwrap_or(&0) + 1;
-        self.nonce.insert(who.to_string(), nonce_value);
+    pub fn inc_nonce(&mut self, who: &T::AccountId) {
+        let new_nonce: T::Nonce = *self.nonce.get(who).unwrap_or(&T::Nonce::zero()) + T::Nonce::one();
+        self.nonce.insert(who.clone(), new_nonce);
+    }
+
+    pub fn get_nonce(&mut self, who: &T::AccountId) -> T::Nonce {
+        *self.nonce.get(who).unwrap_or(&T::Nonce::zero())
     }
 
     // New System Pallet
     pub fn new() -> Self {
         Self {
-            block_number: 0,
-            nonce: BTreeMap::new()
+            block_number: T::BlockNumber::zero(),
+            nonce: BTreeMap::new(),
         }
     }
 }
@@ -38,8 +49,15 @@ mod tests {
     use std::ops::Index;
 
     #[test]
-    fn init_system(){
-        let mut system_pallet = super::Pallet::new();
+    fn init_system() {
+        struct TestConfig;
+        impl super::Config for TestConfig {
+            type AccountId = String;
+            type BlockNumber = u32;
+            type Nonce = u32;
+        }
+
+        let mut system_pallet = super::Pallet::<TestConfig>::new();
         let alice = "alice";
         let bob = "bob";
 
