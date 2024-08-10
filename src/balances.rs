@@ -5,6 +5,7 @@ use num::traits::{CheckedAdd, CheckedSub, Zero};
 pub trait Config: crate::system::Config {
     type Balance: Zero + CheckedSub + CheckedAdd + Copy;
 }
+
 #[derive(Debug)]
 pub struct Pallet<T: Config> {
     // storage mapping from accounts (String) to balances (u128)
@@ -28,7 +29,7 @@ impl<T: Config> Pallet<T> {
         caller: &T::AccountId,
         to: &T::AccountId,
         amount: T::Balance,
-    ) -> Result<(), &'static str> {
+    ) -> crate::support::DispatchResult {
         // Get the balances of caller and to
         let from_balance = self.balance(&caller);
         let to_balance = self.balance(&to);
@@ -54,6 +55,31 @@ impl<T: Config> Pallet<T> {
     }
 }
 
+// Describes the calls we want to expose to the dispatcher
+// Note: The dispatcher handles the caller of each call and thus not included here
+pub enum Call<T: Config> {
+    Transfer { to: T::AccountId, amount: T::Balance },
+}
+
+// Implementation of dispatch logic
+impl<T: Config> crate::support::Dispatch for Pallet<T> {
+    type Caller = T::AccountId;
+    type Call = Call<T>;
+
+    fn dispatch(
+        &mut self,
+        caller: Self::Caller,
+        call: Self::Call,
+    ) -> crate::support::DispatchResult {
+        match call {
+            Call::Transfer { to, amount } => {
+                self.transfer(&caller, &to, amount)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     struct TestConfig;
@@ -67,7 +93,7 @@ mod tests {
     impl super::Config for TestConfig {
         type Balance = u32;
     }
-    
+
     #[test]
     fn init_balances() {
         let mut balances = super::Pallet::<TestConfig>::new();
