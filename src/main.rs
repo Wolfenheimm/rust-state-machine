@@ -3,6 +3,7 @@ use crate::support::Dispatch;
 mod balances;
 mod system;
 mod support;
+mod proof_of_existence;
 
 mod types {
     use crate::RuntimeCall;
@@ -14,6 +15,7 @@ mod types {
     pub type Extrinsic = crate::support::Extrinsic<AccountId, RuntimeCall>;
     pub type Header = crate::support::Header<BlockNumber>;
     pub type Block = crate::support::Block<Header, Extrinsic>;
+    pub type Content = &'static str;
 }
 
 // These are all the calls which are exposed to the world.
@@ -23,13 +25,15 @@ pub enum RuntimeCall { // Outer enum
         - Ask what this enum variant is, how it works
         - Another kind is found in balances.rs, inside enum Call<T: Config>
     */
-    Balances(balances::Call<Runtime>) // Inter enum
+    Balances(balances::Call<Runtime>), // Inter enum
+    ProofOfExistence(proof_of_existence::Call<Runtime>),
 }
 
 #[derive(Debug)]
 pub struct Runtime {
     system: system::Pallet<Self>,
     balances: balances::Pallet<Self>,
+    proof_of_existence: proof_of_existence::Pallet<Self>,
 }
 
 impl system::Config for Runtime {
@@ -40,6 +44,10 @@ impl system::Config for Runtime {
 
 impl balances::Config for Runtime {
     type Balance = types::Balance;
+}
+
+impl proof_of_existence::Config for Runtime {
+    type Content = types::Content;
 }
 
 impl crate::support::Dispatch for Runtime {
@@ -59,6 +67,9 @@ impl crate::support::Dispatch for Runtime {
             RuntimeCall::Balances(call) => {
                 self.balances.dispatch(caller, call)?;
             }
+            RuntimeCall::ProofOfExistence(call) => {
+                self.proof_of_existence.dispatch(caller, call)?;
+            }
         }
 
         Ok(())
@@ -71,13 +82,16 @@ impl Runtime {
         Self {
             system: system::Pallet::new(),
             balances: balances::Pallet::new(),
+            proof_of_existence: proof_of_existence::Pallet::new(),
         }
     }
 
     // Execute a block of extrinsics. Increments the block number.
     fn execute_block(&mut self, block: types::Block) -> support::DispatchResult {
         if self.system.block_number() != block.header.block_number {
-            return Err("Incoming block number does not coincide with system block number");
+            println!("Header Block Number: {}", block.header.block_number);
+            println!("System Block Number: {}", self.system.block_number());
+            return Err("Incoming block number does not coincide with system block number {}");
         }
 
         for (i, support::Extrinsic { call, caller }) in block.extrinsics.into_iter().enumerate() {
@@ -123,13 +137,64 @@ fn main() {
         header: support::Header { block_number: 1 },
         extrinsics: vec![
             support::Extrinsic {
-                caller: alice,
-                call: RuntimeCall::Balances(balances::Call::Transfer { to: bob, amount: 69 }),
+                caller: alice.clone(),
+                call: RuntimeCall::Balances(balances::Call::Transfer { to: bob.clone(), amount: 69 }),
             },
         ],
     };
-    runtime.execute_block(block_1).expect("invalid block");
 
-    // Print runtime information
-    println!("{:#?}", runtime);
+    let block_2 = types::Block {
+        header: support::Header { block_number: 2 },
+        extrinsics: vec![
+            support::Extrinsic {
+                caller: alice.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::CreateClaim {
+                    claim: "Hello, Alice Created a Claim!"
+                }),
+            },
+            support::Extrinsic {
+                caller: bob.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::CreateClaim {
+                    claim: "Hello, Bob Created a Claim!"
+                }),
+            },
+        ],
+    };
+
+    let block_3 = types::Block {
+        header: support::Header { block_number: 3 },
+        extrinsics: vec![
+            support::Extrinsic {
+                caller: alice.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::RevokeClaim {
+                    claim: "Hello, Alice Created a Claim!"
+                }),
+            },
+            support::Extrinsic {
+                caller: bob.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::RevokeClaim {
+                    claim: "Hello, Bob Created a Claim!"
+                }),
+            },
+            support::Extrinsic {
+                caller: charlie.clone(),
+                call: RuntimeCall::ProofOfExistence(proof_of_existence::Call::CreateClaim {
+                    claim: "Hello, Alice and Bob aren't here right now... Can I help you?!"
+                }),
+            },
+        ],
+    };
+
+    runtime.execute_block(block_1).expect("invalid block");
+    println!("{:#?}", runtime); // Print runtime information
+
+    runtime.system.inc_block_number();
+
+    runtime.execute_block(block_2).expect("invalid block");
+    println!("{:#?}", runtime); // Print runtime information
+
+    runtime.system.inc_block_number();
+
+    runtime.execute_block(block_3).expect("invalid block");
+    println!("{:#?}", runtime); // Print runtime information
 }
