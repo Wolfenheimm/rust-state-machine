@@ -31,9 +31,9 @@ impl<T: Config> Pallet<T> {
         self.nonce.insert(who.clone(), new_nonce);
     }
 
-    pub fn get_nonce(&mut self, who: &T::AccountId) -> T::Nonce {
-        *self.nonce.get(who).unwrap_or(&T::Nonce::zero())
-    }
+    // pub fn get_nonce(&mut self, who: &T::AccountId) -> T::Nonce {
+    //     *self.nonce.get(who).unwrap_or(&T::Nonce::zero())
+    // }
 
     // New System Pallet
     pub fn new() -> Self {

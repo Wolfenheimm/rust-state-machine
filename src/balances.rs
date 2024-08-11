@@ -23,11 +23,21 @@ impl<T: Config> Pallet<T> {
         *self.balances.get(who).unwrap_or(&T::Balance::zero())
     }
 
+    // New Balances Pallet
+    pub fn new() -> Self {
+        Self {
+            balances: BTreeMap::new(),
+        }
+    }
+}
+
+#[macros::call]
+impl<T: Config> Pallet<T> {
     // Transfers an amount from one account to another, if possible
     pub fn transfer(
         &mut self,
-        caller: &T::AccountId,
-        to: &T::AccountId,
+        caller: T::AccountId,
+        to: T::AccountId,
         amount: T::Balance,
     ) -> crate::support::DispatchResult {
         // Get the balances of caller and to
@@ -41,41 +51,9 @@ impl<T: Config> Pallet<T> {
         let new_to_balance = to_balance.checked_add(&amount).ok_or("Possible overflow")?;
 
         // Set the new balances for both accounts
-        self.set_balance(caller, new_from_balance);
-        self.set_balance(to, new_to_balance);
+        self.set_balance(&caller, new_from_balance);
+        self.set_balance(&to, new_to_balance);
 
-        Ok(())
-    }
-
-    // New Balances Pallet
-    pub fn new() -> Self {
-        Self {
-            balances: BTreeMap::new(),
-        }
-    }
-}
-
-// Describes the calls we want to expose to the dispatcher
-// Note: The dispatcher handles the caller of each call and thus not included here
-pub enum Call<T: Config> {
-    Transfer { to: T::AccountId, amount: T::Balance },
-}
-
-// Implementation of dispatch logic
-impl<T: Config> crate::support::Dispatch for Pallet<T> {
-    type Caller = T::AccountId;
-    type Call = Call<T>;
-
-    fn dispatch(
-        &mut self,
-        caller: Self::Caller,
-        call: Self::Call,
-    ) -> crate::support::DispatchResult {
-        match call {
-            Call::Transfer { to, amount } => {
-                self.transfer(&caller, &to, amount)?;
-            }
-        }
         Ok(())
     }
 }
@@ -103,7 +81,7 @@ mod tests {
         assert_eq!(balances.balance(&"alice".to_string()), 100);
         assert_eq!(balances.balance(&"bob".to_string()), 0);
         balances
-            .transfer(&"alice".to_string(), &"bob".to_string(), 100)
+            .transfer("alice".to_string(), "bob".to_string(), 100)
             .unwrap();
         assert_eq!(balances.balance(&"alice".to_string()), 0);
         assert_eq!(balances.balance(&"bob".to_string()), 100)
